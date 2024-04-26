@@ -1,6 +1,6 @@
-import { patchState, signalStore, withComputed, withHooks, withMethods, withState } from '@ngrx/signals';
+import { patchState, signalStore, withComputed, withHooks, withMethods } from '@ngrx/signals';
 import { Album, searchAlbums, sortAlbums } from '@/albums/album.model';
-import { SortOrder } from '@/shared/models/sort-order.model';
+import { toSortOrder } from '@/shared/models/sort-order.model';
 import { computed, inject } from '@angular/core';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { exhaustMap, pipe, tap } from 'rxjs';
@@ -12,39 +12,33 @@ import {
   setPending,
   withRequestStatusWithErrorNotification,
 } from '@/shared/state/request-status';
-
-interface AlbumsState {
-  albums: Album[],
-  query: string;
-  order: SortOrder;
-}
+import { setEntities, withEntities } from '@ngrx/signals/entities';
+import { withQueryParams } from '@/shared/state/route/query-params.feature';
 
 export const AlbumSearchStore = signalStore(
   { providedIn: 'root' },
-  withState<AlbumsState>({
-    albums: [],
-    query: '',
-    order: 'asc',
-  }),
+  withEntities<Album>(),
   withRequestStatusWithErrorNotification(),
+  withQueryParams({
+    query: query => query ?? '',
+    order: toSortOrder
+  }),
   withComputed((store) => {
     const filteredAlbums = computed(() =>
-      sortAlbums(searchAlbums(store.albums(), store.query()), store.order()));
+      sortAlbums(searchAlbums(store.entities(), store.query()), store.order()));
     return {
       filteredAlbums,
       totalAlbums: computed(() => filteredAlbums().length),
-      showSpinner: computed(() => store.isPending() && store.albums().length === 0),
+      showSpinner: computed(() => store.isPending() && store.entities().length === 0),
     };
   }),
   withMethods((store, albumsService = inject(AlbumsService)) => ({
-    updateQuery: (query: string) => patchState(store, { query }),
-    updateOrder: (order: SortOrder) => patchState(store, { order }),
     loadAllAlbums: rxMethod<void>(pipe(
       tap(() => patchState(store, setPending())),
       exhaustMap(() => albumsService.getAll().pipe(
         tapResponse(
           (albums) => {
-            patchState(store, { albums }, setFulfilled());
+            patchState(store, setEntities(albums), setFulfilled());
           },
           () => patchState(store, setError('Failed to fetch albums')),
         ),
