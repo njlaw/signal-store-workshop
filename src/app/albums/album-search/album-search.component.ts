@@ -9,7 +9,7 @@ import { AlbumSearchStore } from '@/albums/album-search/album-search.store';
   standalone: true,
   imports: [ProgressBarComponent, AlbumFilterComponent, AlbumListComponent],
   template: `
-    <ngrx-progress-bar [showProgress]="store.showProgress()" />
+    <ngrx-progress-bar [showProgress]="store.requestStatus() === 'pending'" />
 
     <div class="container">
       <h1>Albums ({{ store.totalAlbums() }})</h1>
@@ -26,9 +26,6 @@ import { AlbumSearchStore } from '@/albums/album-search/album-search.store';
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  providers: [
-    AlbumSearchStore,
-  ]
 })
 export default class AlbumSearchComponent {
   protected readonly store = inject(AlbumSearchStore);

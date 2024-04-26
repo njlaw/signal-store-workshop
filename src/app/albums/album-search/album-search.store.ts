@@ -6,45 +6,49 @@ import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { exhaustMap, pipe, tap } from 'rxjs';
 import { AlbumsService } from '@/albums/albums.service';
 import { tapResponse } from '@ngrx/operators';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import {
+  setError,
+  setFulfilled,
+  setPending,
+  withRequestStatusWithErrorNotification,
+} from '@/shared/state/request-status';
 
 interface AlbumsState {
   albums: Album[],
-  showProgress: boolean;
   query: string;
   order: SortOrder;
 }
 
 export const AlbumSearchStore = signalStore(
+  { providedIn: 'root' },
   withState<AlbumsState>({
     albums: [],
-    showProgress: false,
     query: '',
     order: 'asc',
   }),
+  withRequestStatusWithErrorNotification(),
   withComputed((store) => {
     const filteredAlbums = computed(() =>
       sortAlbums(searchAlbums(store.albums(), store.query()), store.order()));
     return {
       filteredAlbums,
       totalAlbums: computed(() => filteredAlbums().length),
-      showSpinner: computed(() => store.showProgress() && store.albums().length === 0),
+      showSpinner: computed(() => store.isPending() && store.albums().length === 0),
     };
   }),
-  withMethods((store, albumsService = inject(AlbumsService), snackBar = inject(MatSnackBar)) => ({
+  withMethods((store, albumsService = inject(AlbumsService)) => ({
     updateQuery: (query: string) => patchState(store, { query }),
     updateOrder: (order: SortOrder) => patchState(store, { order }),
     loadAllAlbums: rxMethod<void>(pipe(
-      tap(() => patchState(store, { showProgress: true })),
+      tap(() => patchState(store, setPending())),
       exhaustMap(() => albumsService.getAll().pipe(
         tapResponse(
-          (albums) => patchState(store, { albums }, { showProgress: false}),
-          () => {
-            snackBar.open('Error fetching albums', 'Error', { duration: 3000 });
-            patchState(store, { showProgress: false });
+          (albums) => {
+            patchState(store, { albums }, setFulfilled());
           },
-        )
-      ))
+          () => patchState(store, setError('Failed to fetch albums')),
+        ),
+      )),
     )),
   })),
   withHooks((store) => ({
