@@ -6,7 +6,7 @@ import { AlbumFilterComponent } from './album-filter/album-filter.component';
 import { AlbumListComponent } from './album-list/album-list.component';
 import { patchState, signalState } from '@ngrx/signals';
 import { AlbumsService } from '@/albums/albums.service';
-import { exhaustMap, pipe } from 'rxjs';
+import { exhaustMap, pipe, tap } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { tapResponse } from '@ngrx/operators';
@@ -52,6 +52,7 @@ export default class AlbumSearchComponent implements OnInit {
   readonly #snackBar = inject(MatSnackBar);
 
   readonly loadAllAlbums = rxMethod<void>(pipe(
+    tap(() => patchState(albumsState, { showProgress: true })),
     exhaustMap(() => this.#albumsService.getAll().pipe(
       tapResponse(
         (albums) => patchState(albumsState, { albums }, { showProgress: false}),
@@ -76,8 +77,6 @@ export default class AlbumSearchComponent implements OnInit {
   })
 
   ngOnInit() {
-    patchState(albumsState, { showProgress: true });
-
     this.loadAllAlbums();
   }
 
